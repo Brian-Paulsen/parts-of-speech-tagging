@@ -8,5 +8,10 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 if __name__ == '__main__':
     df = pd.read_csv('../data/brown.csv')
     print(df.head())
-    tokenizedText = df.loc[0, 'tokenized_text']
-    print(word_tokenize(tokenizedText))
+    
+    df1 = pd.DataFrame({
+        'a' : ['as er ad', 'red dr as', 're dr efe'] 
+    })
+    checks = set(['er', 're'])
+    print(['as', 'er', 'ad'] in ['er', 're'])
+    print(list(bool(set(d.split()) & checks) for d in df1['a']))
