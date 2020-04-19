@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from nltk.tokenize import word_tokenize
 
 pd.options.mode.chained_assignment = None 
 
 
 def clean_tokens(str):
-    return str.replace('fw-', '').replace('-tl', '').replace('-hl', '').replace('-nc', '')
+    return str.replace('fw-', '').replace('-tl', '').replace('-hl', '').replace('-nc', '').replace('$', '')
 
 def clean_sentence(sentence: str):
     parts = sentence.split(' ')
@@ -46,7 +44,7 @@ if __name__ == '__main__':
 
     distinctTags = set()
     for l in cleanDf['tokenized_pos']:
-        tags = set(word_tokenize(l))
+        tags = set(l.split())
         distinctTags |= tags
     print(sorted(distinctTags))
     

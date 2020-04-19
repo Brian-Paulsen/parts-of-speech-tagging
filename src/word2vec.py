@@ -4,7 +4,6 @@ import pickle
 from math import floor
 import pandas as pd
 from gensim.models import Word2Vec
-from nltk.tokenize import word_tokenize
 
 
 df = pd.read_csv('../data/brown-cleaned.csv')
@@ -12,7 +11,7 @@ df = pd.read_csv('../data/brown-cleaned.csv')
 data = []
 
 for sentence in df['tokenized_text']:
-    data.append(word_tokenize(sentence))
+    data.append(sentence.split())
     
 print('Training Word2Vec...')
 start = time.time()
