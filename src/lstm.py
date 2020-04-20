@@ -6,9 +6,11 @@ import tensorflow as tf
 from gensim.models import Word2Vec 
 from nltk.tokenize import word_tokenize
 
+from tensorflow.keras import Model
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Activation, LSTM, Masking, TimeDistributed, Dense, Embedding
-from tensorflow.keras.layers import Bidirectional
+from tensorflow.keras.layers import Activation, LSTM, Masking, TimeDistributed
+from tensorflow.keras.layers import Dense, Embedding, Input
+from tensorflow.keras.layers import Bidirectional, Concatenate, Reshape
 
 
 # From clean-data.py, we know there are 179 tags and 56057 words
@@ -17,7 +19,8 @@ from tensorflow.keras.layers import Bidirectional
 # Architectures:
 #   1: single-directional
 #   2: bi-directional
-architecture = 2
+#   3: bi-directional, input feeds into output
+architecture = 3
 
 
 def numToVec(num, size=179):
@@ -101,6 +104,20 @@ if __name__ == '__main__':
         model.add(Bidirectional(LSTM(256, return_sequences=True)))
         model.add(TimeDistributed(Dense(179)))
         model.add(Activation('softmax'))
+        
+        model.compile(loss='categorical_crossentropy', optimizer='adam', 
+                      metrics=['categorical_accuracy'])
+        model.fit(trainSet, epochs=10, validation_data=valSet, verbose=2)
+        model.evaluate(testSet) # 0.9951
+    elif architecture == 3:
+        input1D = Input(shape=(180,))
+        # input2D = Reshape((180, 1))(input1D)
+        embedding = Embedding(56058, 50, input_length=180)(input1D)
+        lstm = Bidirectional(LSTM(256, return_sequences=True))(embedding)
+        concat = Concatenate()([embedding, lstm])
+        dense = TimeDistributed(Dense(179))(concat)
+        output = Activation('softmax')(dense)
+        model = Model(inputs=[input1D], outputs=[output])
         
         model.compile(loss='categorical_crossentropy', optimizer='adam', 
                       metrics=['categorical_accuracy'])
