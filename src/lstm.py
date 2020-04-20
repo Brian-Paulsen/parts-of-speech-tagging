@@ -1,48 +1,87 @@
 import pandas as pd
+import os
 import numpy as np
 import nltk
+import tensorflow as tf
 from gensim.models import Word2Vec 
 from nltk.tokenize import word_tokenize
 
-from keras.models import Sequential
-from keras.layers import Activation, LSTM
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Activation, LSTM, Masking, TimeDistributed, Dense, Embedding
+
+
+# From clean-data.py, we know there are 179 tags and 56057 words
+
+def numToVec(num, size=179):
+    vec = np.zeros((size))
+    vec[num] = 1
+    return vec
+
+def preprocess(line):
+    defaults = [tf.constant([], dtype=tf.string)]*6
+    pieces = tf.io.decode_csv(line, defaults)
+    words = tf.strings.to_number(tf.strings.split(pieces[4]), out_type=tf.dtypes.int32)
+    tags = tf.strings.to_number(tf.strings.split(pieces[5]), out_type=tf.dtypes.int32)
+    y = tf.one_hot(tags, 179)   
+    return words, y
+    
+
+def csv_reader_dataset(filepaths, repeat=1, n_readers=5, n_read_threads=None,
+                       shuffle_buffer_size=10000, n_parse_threads=5, batch_size=32):
+    dataset = tf.data.Dataset.list_files(filepaths)
+    dataset = dataset.interleave(
+                lambda filepath: tf.data.TextLineDataset(filepath).skip(1),
+                cycle_length=n_readers, num_parallel_calls=n_read_threads
+            )
+    dataset = dataset.map(preprocess, num_parallel_calls=n_parse_threads)
+    dataset = dataset.shuffle(shuffle_buffer_size).repeat(repeat)
+    return dataset.batch(batch_size).prefetch(1)
 
 
 if __name__ == '__main__':
-    df = pd.read_csv('../data/brown-cleaned.csv')
-    print(df.head())
+    
+#    train_filepaths = ['../data/processed/train/train-{}.csv'.format(i) for i in range(10)]
+#    filepath_dataset = tf.data.Dataset.list_files(train_filepaths, seed=42)
+#    
+#    n_readers = 5
+#    dataset = filepath_dataset.interleave(
+#            lambda filepath: tf.data.TextLineDataset(filepath).skip(1),
+#            cycle_length = n_readers
+#        )
+#    
+#    for line in dataset.take(5):
+#        #preprocess(line.numpy())
+#        print(preprocess(line.numpy()))
+    
+    trainDir = '../data/processed/train'
+    trainFiles = os.listdir(trainDir)
+    trainPaths = []
+    for file in trainFiles:
+        trainPaths.append(os.path.join(trainDir, file))
+    
+    valDir = '../data/processed/validation'
+    valFiles = os.listdir(valDir)
+    valPaths = []
+    for file in valFiles:
+        valPaths.append(os.path.join(valDir, file))
         
-    word2VecModel = Word2Vec.load('../models/word2Vec.model')
-    
-    uniqueTagsSet = set()
-    for sentence in df['tokenized_pos']:
-        uniqueTagsSet |= set(sentence.split(' '))
-    uniqueTags = list(uniqueTagsSet)
-    uniqueTagCount = len(uniqueTags)
-    
-    tagDict = {}
-    for i in range(uniqueTagCount):
-        tagDict[uniqueTags[i]] = i
-    
-    inputLists = []
-    outputLists = []
-    for i in range(df.shape[0]):
-        sentence = df.loc[i, 'tokenized_text']
-        tagsStr = df.loc[i, 'tokenized_pos']
-        words = sentence.split(' ')
-        tags = tagsStr.split(' ')
-        wordCount = len(words)
-        inputList = np.zeros((50, wordCount))
-        outputList = np.zeros((uniqueTagCount, wordCount))
-        for i in range(wordCount):
-            inputList[:,i] = word2VecModel.wv[words[i]]
-            outputList[tagDict[tags[i]], i] = 1
-        inputLists.append(inputList)
-        outputLists.append(outputList)
+    testDir = '../data/processed/test'
+    testFiles = os.listdir(testDir)
+    testPaths = []
+    for file in testFiles:
+        testPaths.append(os.path.join(testDir, file))
         
-model = Sequential()
-model.add(LSTM(30, return_sequences=True))
-model.add(Activation('softmax'))
+    trainSet = csv_reader_dataset(trainPaths)
+    valSet = csv_reader_dataset(valPaths)
+    testSet = csv_reader_dataset(testPaths)
 
-model.compile(loss='categorical_crossentropy', optimizer='adam', 
-              metrics=['categorical_accuracy'])
+    print('Training model...')
+    model = Sequential()
+    model.add(Embedding(56058, 50, input_length=180))
+    model.add(LSTM(256, return_sequences=True))
+    model.add(TimeDistributed(Dense(179)))
+    model.add(Activation('softmax'))
+    
+    model.compile(loss='categorical_crossentropy', optimizer='adam', 
+                  metrics=['categorical_accuracy'])
+    model.fit(trainSet, epochs=7, validation_data=valSet, verbose=2)
