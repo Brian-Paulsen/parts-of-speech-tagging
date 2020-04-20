@@ -8,9 +8,17 @@ from nltk.tokenize import word_tokenize
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Activation, LSTM, Masking, TimeDistributed, Dense, Embedding
+from tensorflow.keras.layers import Bidirectional
 
 
 # From clean-data.py, we know there are 179 tags and 56057 words
+
+
+# Architectures:
+#   1: single-directional
+#   2: bi-directional
+architecture = 2
+
 
 def numToVec(num, size=179):
     vec = np.zeros((size))
@@ -76,12 +84,25 @@ if __name__ == '__main__':
     testSet = csv_reader_dataset(testPaths)
 
     print('Training model...')
-    model = Sequential()
-    model.add(Embedding(56058, 50, input_length=180))
-    model.add(LSTM(256, return_sequences=True))
-    model.add(TimeDistributed(Dense(179)))
-    model.add(Activation('softmax'))
-    
-    model.compile(loss='categorical_crossentropy', optimizer='adam', 
-                  metrics=['categorical_accuracy'])
-    model.fit(trainSet, epochs=7, validation_data=valSet, verbose=2)
+    if architecture == 1:
+        model = Sequential()
+        model.add(Embedding(56058, 50, input_length=180))
+        model.add(LSTM(256, return_sequences=True))
+        model.add(TimeDistributed(Dense(179)))
+        model.add(Activation('softmax'))
+        
+        model.compile(loss='categorical_crossentropy', optimizer='adam', 
+                      metrics=['categorical_accuracy'])
+        model.fit(trainSet, epochs=7, validation_data=valSet, verbose=2)
+        model.evaluate(testSet)
+    elif architecture == 2:
+        model = Sequential()
+        model.add(Embedding(56058, 50, input_length=180))
+        model.add(Bidirectional(LSTM(256, return_sequences=True)))
+        model.add(TimeDistributed(Dense(179)))
+        model.add(Activation('softmax'))
+        
+        model.compile(loss='categorical_crossentropy', optimizer='adam', 
+                      metrics=['categorical_accuracy'])
+        model.fit(trainSet, epochs=10, validation_data=valSet, verbose=2)
+        model.evaluate(testSet)
