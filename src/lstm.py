@@ -9,8 +9,8 @@ from nltk.tokenize import word_tokenize
 from tensorflow.keras import Model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Activation, LSTM, Masking, TimeDistributed
-from tensorflow.keras.layers import Dense, Embedding, Input
-from tensorflow.keras.layers import Bidirectional, Concatenate, Reshape
+from tensorflow.keras.layers import Dense, Embedding, Input, BatchNormalization
+from tensorflow.keras.layers import Bidirectional, Concatenate, Reshape, Dropout
 
 
 # From clean-data.py, we know there are 179 tags and 56057 words
@@ -20,7 +20,7 @@ from tensorflow.keras.layers import Bidirectional, Concatenate, Reshape
 #   1: single-directional
 #   2: bi-directional
 #   3: bi-directional, input feeds into output
-architecture = 3
+architecture = 2
 
 
 def numToVec(num, size=179):
@@ -50,19 +50,6 @@ def csv_reader_dataset(filepaths, repeat=1, n_readers=5, n_read_threads=None,
 
 
 if __name__ == '__main__':
-    
-#    train_filepaths = ['../data/processed/train/train-{}.csv'.format(i) for i in range(10)]
-#    filepath_dataset = tf.data.Dataset.list_files(train_filepaths, seed=42)
-#    
-#    n_readers = 5
-#    dataset = filepath_dataset.interleave(
-#            lambda filepath: tf.data.TextLineDataset(filepath).skip(1),
-#            cycle_length = n_readers
-#        )
-#    
-#    for line in dataset.take(5):
-#        #preprocess(line.numpy())
-#        print(preprocess(line.numpy()))
     
     trainDir = '../data/processed/train'
     trainFiles = os.listdir(trainDir)
@@ -101,25 +88,33 @@ if __name__ == '__main__':
     elif architecture == 2:
         model = Sequential()
         model.add(Embedding(56058, 50, input_length=180))
+        model.add(Dropout(0.5))
+        model.add(BatchNormalization())
         model.add(Bidirectional(LSTM(256, return_sequences=True)))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.5))
         model.add(TimeDistributed(Dense(179)))
+        model.add(BatchNormalization())
         model.add(Activation('softmax'))
         
         model.compile(loss='categorical_crossentropy', optimizer='adam', 
                       metrics=['categorical_accuracy'])
-        model.fit(trainSet, epochs=10, validation_data=valSet, verbose=2)
-        model.evaluate(testSet) # 0.9951
+        model.fit(trainSet, epochs=15, validation_data=valSet, verbose=2)
+        model.evaluate(testSet) # 0.9960
     elif architecture == 3:
-        input1D = Input(shape=(180,))
-        # input2D = Reshape((180, 1))(input1D)
-        embedding = Embedding(56058, 50, input_length=180)(input1D)
-        lstm = Bidirectional(LSTM(256, return_sequences=True))(embedding)
-        concat = Concatenate()([embedding, lstm])
-        dense = TimeDistributed(Dense(179))(concat)
-        output = Activation('softmax')(dense)
-        model = Model(inputs=[input1D], outputs=[output])
+        input_ = Input(shape=(180,))
+        embedding = Embedding(56058, 50, input_length=180)(input_)
+        dropout1 = Dropout(0.5)(embedding)
+        lstm = Bidirectional(LSTM(256, return_sequences=True))(dropout1)
+        batchNorm1 = BatchNormalization()(lstm)
+        concat = Concatenate()([embedding, batchNorm1])
+        dropout2 = Dropout(0.5)(concat)
+        dense = TimeDistributed(Dense(179))(dropout2)
+        batchNorm2 = BatchNormalization()(dense)
+        output = Activation('softmax')(batchNorm2)
+        model = Model(inputs=[input_], outputs=[output])
         
         model.compile(loss='categorical_crossentropy', optimizer='adam', 
                       metrics=['categorical_accuracy'])
         model.fit(trainSet, epochs=10, validation_data=valSet, verbose=2)
-        model.evaluate(testSet)
+        model.evaluate(testSet) # 0.9955
