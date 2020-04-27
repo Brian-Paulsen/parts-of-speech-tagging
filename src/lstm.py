@@ -99,7 +99,7 @@ if __name__ == '__main__':
         
         model.compile(loss='categorical_crossentropy', optimizer='adam', 
                       metrics=['categorical_accuracy'])
-        model.fit(trainSet, epochs=15, validation_data=valSet, verbose=2)
+        model.fit(trainSet, epochs=20, validation_data=valSet, verbose=2)
         model.evaluate(testSet) # 0.9960
     elif architecture == 3:
         input_ = Input(shape=(180,))
