@@ -1,5 +1,6 @@
-data
-env
+env # my virtual env.
+/data/processed
+/data/brown
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
